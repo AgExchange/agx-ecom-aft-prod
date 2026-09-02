@@ -11,6 +11,7 @@ import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import 'dotenv/config';
 import path from 'path';
+import { customFields } from './custom-fields';
 import { ShippingByWeightPlugin } from './plugins/shipping-by-weight/shipping-by-weight.plugin';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
@@ -61,7 +62,7 @@ export const config: VendureConfig = {
     },
     // When adding or altering custom field definitions, the database will
     // need to be updated. See the "Migrations" section in README.md.
-    customFields: {},
+    customFields,
     plugins: [
         GraphiqlPlugin.init(),
         AssetServerPlugin.init({
