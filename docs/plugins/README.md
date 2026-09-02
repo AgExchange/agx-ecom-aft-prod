@@ -12,6 +12,9 @@ brought across — a custom field, a migration, a caller script, an env var.
 | Plugin | Source | Status | Notes |
 | --- | --- | --- | --- |
 | [shipping-by-weight](./shipping-by-weight.md) | `src/plugins/shipping-by-weight/` | Ported, verified | Depends on Logistics custom fields |
+| [product-info](./product-info.md) | `src/plugins/product-info/` | Ported, runtime check outstanding | Headless; driven by `src/scripts/export-*.ts` |
+| [order-metadata-ui](./order-metadata-ui.md) | `src/plugins/order-metadata-ui/` | Ported, verified | Dashboard UI extension; 14 OrderLine custom fields |
+| [contact](./contact.md) | `src/plugins/contact/` | Ported, verified | REST controller; publishes `ContactUsEvent` → email |
 
 ## What each document should cover
 

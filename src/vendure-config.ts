@@ -5,7 +5,12 @@ import {
     DefaultSearchPlugin,
     VendureConfig,
 } from '@vendure/core';
-import { defaultEmailHandlers, EmailPlugin, FileBasedTemplateLoader } from '@vendure/email-plugin';
+import {
+    defaultEmailHandlers,
+    EmailEventListener,
+    EmailPlugin,
+    FileBasedTemplateLoader,
+} from '@vendure/email-plugin';
 import { AssetServerPlugin } from '@vendure/asset-server-plugin';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
@@ -13,11 +18,32 @@ import 'dotenv/config';
 import path from 'path';
 import { customFields } from './custom-fields';
 import { ShippingByWeightPlugin } from './plugins/shipping-by-weight/shipping-by-weight.plugin';
+import { ProductInfoPlugin } from './plugins/product-info/product-info.plugin';
+import { OrderMetadataUiPlugin } from './plugins/order-metadata-ui/order-metadata-ui.plugin';
+import { ContactPlugin } from './plugins/contact/contact.plugin';
+import { ContactUsEvent } from './events';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 // PORT wins because hosting platforms inject it into the environment at runtime, and that
 // must take precedence over any value baked into the .env file at scaffold time.
 const serverPort = +process.env.PORT || +process.env.VENDURE_SERVER_PORT || 3000;
+
+// ---------------------------------------------------------------------------
+// Contact Us — email handler for the event published by ContactPlugin.
+//
+// No plugin is required to listen: EmailPlugin subscribes to any VendureEvent
+// via eventBus.ofType(handler.event). The recipient is resolved by the
+// controller before publishing and carried on the event itself, so this handler
+// does not need to re-read the channel.
+//
+// Template: static/email/templates/contact-admin-notification/body.hbs
+// ---------------------------------------------------------------------------
+const contactAdminNotificationHandler = new EmailEventListener('contact-admin-notification')
+    .on(ContactUsEvent)
+    .setRecipient(event => event.contact.recipientEmail)
+    .setFrom('{{ fromAddress }}')
+    .setSubject('New Contact Request from {{ contact.firstName }} {{ contact.lastName }}')
+    .setTemplateVars(event => ({ contact: event.contact }));
 
 export const config: VendureConfig = {
     apiOptions: {
@@ -80,7 +106,7 @@ export const config: VendureConfig = {
             devMode: true,
             outputPath: path.join(__dirname, '../static/email/test-emails'),
             route: 'mailbox',
-            handlers: defaultEmailHandlers,
+            handlers: [...defaultEmailHandlers, contactAdminNotificationHandler],
             templateLoader: new FileBasedTemplateLoader(path.join(__dirname, '../static/email/templates')),
             globalTemplateVars: {
                 // The following variables will change depending on your storefront implementation.
@@ -98,5 +124,9 @@ export const config: VendureConfig = {
                 : path.join(__dirname, 'dashboard'),
         }),
         ShippingByWeightPlugin.init({}),
+        ProductInfoPlugin.init({}),
+        // Registered bare (no .init()) — neither takes options.
+        OrderMetadataUiPlugin,
+        ContactPlugin,
     ],
 };

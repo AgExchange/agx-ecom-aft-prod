@@ -10,3 +10,6 @@ dev/
 
 # Environment files
 .env
+
+# Output of the src/scripts/export-* maintenance scripts
+exports/

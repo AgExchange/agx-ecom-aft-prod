@@ -1,0 +1,50 @@
+{{> header title="New Contact Request" }}
+
+<mj-section>
+    <mj-column>
+        <mj-text>
+            <h2>New Contact Request</h2>
+            <p>A customer has submitted a contact request via the website. Details are below.</p>
+        </mj-text>
+    </mj-column>
+</mj-section>
+
+<mj-section>
+    <mj-column>
+        <mj-table cellpadding="8px">
+            <tr>
+                <td style="font-weight: bold; width: 140px;">First Name</td>
+                <td>{{ contact.firstName }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight: bold;">Last Name</td>
+                <td>{{ contact.lastName }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight: bold;">Email</td>
+                <td>{{ contact.email }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight: bold;">Phone</td>
+                <td>{{ contact.phone }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight: bold;">Submitted</td>
+                <td>{{ formatDate contact.submittedAt }}</td>
+            </tr>
+        </mj-table>
+    </mj-column>
+</mj-section>
+
+<mj-section>
+    <mj-column>
+        <mj-text>
+            <strong>Message:</strong>
+        </mj-text>
+        <mj-text>
+            {{ contact.message }}
+        </mj-text>
+    </mj-column>
+</mj-section>
+
+{{> footer }}
