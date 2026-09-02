@@ -1,0 +1,26 @@
+# Local development services for agx-aft-vendure.
+#
+# The explicit project name keeps container, volume and network names stable
+# regardless of the folder this file happens to live in.
+name: agx-aft-vendure
+
+services:
+  database:
+    # Pinned to match the production database server. Keep these in step:
+    # a major-version difference between dev and prod can change migration behaviour.
+    image: postgres:18.2-alpine
+    container_name: agx-aft-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vendure
+      POSTGRES_PASSWORD: vendure
+      POSTGRES_DB: agx_aft_dev
+    ports:
+      # host:container - if another local Postgres already owns 5432,
+      # change the host side and update DB_PORT in .env to match.
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

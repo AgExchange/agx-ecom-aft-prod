@@ -1,0 +1,12 @@
+node_modules
+dist
+admin-ui
+static/assets
+static/email/test-emails
+.vendure/
+
+# Local dev fixtures
+dev/
+
+# Environment files
+.env
