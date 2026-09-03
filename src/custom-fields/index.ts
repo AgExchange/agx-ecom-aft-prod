@@ -1,8 +1,10 @@
 import { VendureConfig } from '@vendure/core';
 
 import { channelContactFields } from './channel-contacts';
+import { geoAddressFields } from './geo';
 import { logisticsProductVariantFields } from './logistics';
 import { orderMetadataOrderLineFields } from './order-metadata';
+import { productContentFields } from './product-content';
 
 /**
  * Custom field definitions, composed from one module per domain.
@@ -15,11 +17,17 @@ import { orderMetadataOrderLineFields } from './order-metadata';
  * across plugins belongs here.
  */
 export const customFields: VendureConfig['customFields'] = {
+    Address: [
+        ...geoAddressFields,
+    ],
     Channel: [
         ...channelContactFields,
     ],
     OrderLine: [
         ...orderMetadataOrderLineFields,
+    ],
+    Product: [
+        ...productContentFields,
     ],
     ProductVariant: [
         ...logisticsProductVariantFields,
