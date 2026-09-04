@@ -6,7 +6,7 @@
 | **Integration type** | Plain source folder |
 | **Ported from** | `agx-stores` — `src/plugins/quote-plugin/` |
 | **Ported on** | 2026-09-02 (stage 2) |
-| **Status** | Ported; structurally verified. Workflow not exercised — see [Verification](#verification) |
+| **Status** | Ported. Creation + reference generation **proven**; send/accept blocked — see [Verification](#verification) |
 | **Vendure compatibility** | `^3.0.0` |
 | **External npm dependencies** | None to install |
 
@@ -145,15 +145,38 @@ pre-production.
   in the introspected schema
 - Dashboard extension bundled (`Quote` strings present in `dist/dashboard/`)
 
-**Not proven — no workflow was exercised:**
+### Workflow exercised 2026-09-03 (admin path)
 
-- Reference generation and the pessimistic lock (`Q-2026-00042`, per-channel,
-  per-year, no duplicates under concurrency)
-- Any state transition
+**Proven by running it against the dev database:**
+
+- `createQuote` sets `quoteStatus: "requested"`, stamps `quoteRequestedAt`, and
+  defaults `quoteValidUntil` to **+7 days** — i.e. `QUOTE_VALIDITY_DAYS` from `.env`
+  is read correctly.
+- **Reference generation works and increments**: three quotes produced
+  `Q-2026-00001`, `Q-2026-00002`, `Q-2026-00003`, and the `quote_sequence` table
+  holds exactly one row — `year: 2026, lastValue: 3, channelId: 1` — correctly
+  scoped per channel and year, with no gaps.
+- `updateQuoteNotes` and `setQuoteValidity` both persist (validity moved +7 -> +14 days).
+- **Business rules fire with clear messages**, rather than failing silently:
+  - *"This order needs a customer assigned before it can become a quote."*
+  - *"A quote must have a shipping method assigned before it can be sent."*
+
+**Blocked, not failed:** `sendQuote` and `acceptQuote` could not be reached, because
+the prerequisite `setDraftOrderShippingMethod` **hangs indefinitely** and wedges the
+database connection. That is a Vendure core path, not a quote-plugin defect — see
+[multivendor-plugin](./multivendor-plugin.md), which replaces
+`shippingLineAssignmentStrategy` and is the prime suspect (unproven).
+
+**Still not proven:**
+
+- `sendQuote`, the re-send `quoteRevision` bump, and `acceptQuote` (blocked above)
+- The pessimistic lock **under concurrency** — the test was single-threaded, so it
+  proved the counter increments, not that it is race-safe
 - `quoteExpirySweepTask` firing
 - The dashboard panel rendering
+- The shop-API path (`requestQuote` etc.), which needs a registered, verified
+  customer — the dev database has none
 - Interaction with `defaultOrderProcess` and multivendor's `mvOrderProcess`
-  (see [multivendor-plugin](./multivendor-plugin.md))
 
 To exercise it: create a draft order, call `requestQuote` on the Shop API,
 `sendQuote` on the Admin API, then `acceptQuote`, checking `quoteStatus` and

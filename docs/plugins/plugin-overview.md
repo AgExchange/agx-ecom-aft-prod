@@ -13,12 +13,12 @@ brought across — a custom field, a migration, a caller script, an env var.
 | --- | --- | --- | --- |
 | [shipping-by-weight](./shipping-by-weight.md) | `src/plugins/shipping-by-weight/` | Ported, verified | Depends on Logistics custom fields |
 | [product-info](./product-info.md) | `src/plugins/product-info/` | Ported, runtime check outstanding | Headless; driven by `src/scripts/export-*.ts` |
-| [order-metadata-ui](./order-metadata-ui.md) | `src/plugins/order-metadata-ui/` | Ported, verified | Dashboard UI extension; 14 OrderLine custom fields |
+| [order-metadata-ui](./order-metadata-ui.md) | `src/plugins/order-metadata-ui/` | Ported, bundle confirmed | Dashboard UI extension; 14 OrderLine custom fields |
 | [contact](./contact.md) | `src/plugins/contact/` | Ported, verified | REST controller; publishes `ContactUsEvent` → email |
 | [cms](./cms.md) | `src/plugins/cms/` | Ported, structural only | Needs a Payload CMS instance to test |
 | [pim-sync](./pim-sync.md) | `src/plugins/pim-sync/` | Ported, structural only | Needs AtroPIM. **Read the `mpn` index drift note before running `migrate -g`** |
-| [quote-plugin](./quote-plugin.md) | `src/plugins/quote-plugin/` | Ported, structural only | First plugin with an entity (`quote_sequence`) |
-| [multivendor-plugin](./multivendor-plugin.md) | `src/plugins/multivendor-plugin/` | Ported, structural only | Replaces two core strategies; registration order matters |
+| [quote-plugin](./quote-plugin.md) | `src/plugins/quote-plugin/` | Ported; creation verified, send/accept blocked | First plugin with an entity (`quote_sequence`) |
+| [multivendor-plugin](./multivendor-plugin.md) | `src/plugins/multivendor-plugin/` | Ported, structural only | Replaces two core strategies. **Prime suspect for the checkout hang — read the doc** |
 | [payfast-plugin](./payfast-plugin.md) | `src/plugins/payfast-plugin/` | Ported, structural only | RSA payments; needs a public host for ITN |
 | [dsv-shipping-plugin](./dsv-shipping-plugin.md) | `src/plugins/dsv-shipping-plugin/` | Ported, structural only | Flattened from an npm package. **Contains a live production bug — read the doc** |
 | [dsv-sadc-plugin](./dsv-sadc-plugin.md) | `src/plugins/dsv-sadc-plugin/` | Ported, structural only | Flattened from an npm package. SOAP/XML; pairs with dsv-sadc-ui |

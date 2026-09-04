@@ -145,6 +145,28 @@ setup, so they are worth restoring when test setup becomes its own task.
 
 ## Known issues
 
+0. **SUSPECTED: `setDraftOrderShippingMethod` hangs.** Reproducible in a clean
+   environment with this plugin active — the request never returns, the Postgres
+   session is left `idle in transaction` waiting on `ClientRead` after a
+   `ShippingMethodTranslation` query, and the server logs
+   *"Calling client.query() when the client is already executing a query"* — i.e.
+   two queries racing on one connection, which `node-postgres` does not support.
+   The connection is unusable afterwards.
+
+   This plugin **replaces** `config.shippingOptions.shippingLineAssignmentStrategy`,
+   so `MultivendorShippingLineAssignmentStrategy` runs on exactly this path, which
+   makes it the prime suspect. **It is not proven.** Reading the strategy
+   (`config/mv-shipping-line-assignment-strategy.ts`) shows only sequential awaits
+   and no `Promise.all`, so the mechanism is not obvious. An isolation run — one
+   server, this plugin commented out, single request — would settle it in minutes.
+
+   One untested lead: an order *with* a shipping address behaved differently from one
+   without, so a missing address may be the trigger.
+
+   **This path is on every order**, so it blocks real checkout and should be resolved
+   before go-live. It also blocked verification of
+   [quote-plugin](./quote-plugin.md)'s send/accept steps.
+
 1. **Two single-valued strategy replacements.** `orderSellerStrategy` and
    `shippingLineAssignmentStrategy` are overwritten, not composed. Any future
    plugin needing either will conflict silently — last registration wins, with no
