@@ -1,7 +1,7 @@
 import { bootstrapWorker, Logger, RequestContextService } from '@vendure/core';
 
-import { config } from '../vendure-config';
-import { ProductInfoService } from '../plugins/product-info/services/product-info.service';
+import { config } from '../../vendure-config';
+import { ProductInfoService } from '../../plugins/product-info/services/product-info.service';
 
 if (require.main === module) {
   exportLowStockVariants()

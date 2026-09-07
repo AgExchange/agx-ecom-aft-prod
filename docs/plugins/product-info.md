@@ -39,8 +39,8 @@ here the plugin folder is barely half of it.
 
 | File | Purpose |
 | --- | --- |
-| `src/scripts/export-all-variants.ts` | Boots a worker, calls `exportAllVariantsToCsv()`. |
-| `src/scripts/export-low-stock-variants.ts` | Boots a worker, calls `exportLowStockVariantsToCsv()`. |
+| `src/scripts/catalogue-exports/export-all-variants.ts` | Boots a worker, calls `exportAllVariantsToCsv()`. |
+| `src/scripts/catalogue-exports/export-low-stock-variants.ts` | Boots a worker, calls `exportLowStockVariantsToCsv()`. |
 
 Both follow the same three steps:
 
@@ -125,7 +125,7 @@ ts-node-only and never reach `dist/`. **This repo deliberately does not.** With
 `dist/scripts/` and can run on the VM as:
 
 ```bash
-node dist/scripts/export-all-variants.js
+node dist/scripts/catalogue-exports/export-all-variants.js
 ```
 
 `ts-node` is a devDependency and won't necessarily be installed in production, so
@@ -233,7 +233,9 @@ Two deliberate differences:
    having ~50 scripts.
 
 This port also establishes `src/scripts/` as the home for maintenance scripts in
-this repo — relevant, since agx-stores has 50 of them waiting.
+this repo — relevant, since agx-stores has 50 of them waiting. Scripts are grouped
+into purpose subfolders (`catalogue-exports/`, `connectivity-checks/`) so that
+growth does not turn the folder into a flat list of 50 files.
 
 ## Known issues
 

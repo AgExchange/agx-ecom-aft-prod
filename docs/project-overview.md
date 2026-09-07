@@ -46,7 +46,7 @@ config file:
 | `src/custom-fields/` | One module per domain, composed in `index.ts`. A field used by one plugin lives in that plugin; a field shared across plugins lives here |
 | `src/events/` | `VendureEvent` subclasses that cross a plugin boundary |
 | `src/migrations/` | One migration per stage, not per plugin |
-| `src/scripts/` | Maintenance scripts run by hand (`npm run export:variants`) |
+| `src/scripts/` | Maintenance scripts run by hand, grouped by purpose. `catalogue-exports/` boots a Vendure worker and writes CSVs (`npm run export:variants`); `connectivity-checks/` probes an external service without starting Vendure (`npm run check:pim`) |
 
 ## Migration strategy
 

@@ -14,8 +14,9 @@
     "start:server": "node ./dist/index.js",
     "start:worker": "node ./dist/index-worker.js",
     "start": "vendure start all",
-    "export:variants": "ts-node ./src/scripts/export-all-variants.ts",
-    "export:low-stock": "ts-node ./src/scripts/export-low-stock-variants.ts"
+    "export:variants": "ts-node ./src/scripts/catalogue-exports/export-all-variants.ts",
+    "export:low-stock": "ts-node ./src/scripts/catalogue-exports/export-low-stock-variants.ts",
+    "check:pim": "ts-node ./src/scripts/connectivity-checks/pim-probe.ts"
   },
   "dependencies": {
     "@vendure/asset-server-plugin": "3.7.2",
