@@ -12,6 +12,7 @@ import {
 } from '@vendure/core';
 import { DpoClient } from './api/dpo-client';
 import { DPO_PAY_METHOD_CODE } from './config/constants';
+import { dpoLog } from './config/dpo-log';
 import { DPO_PAY_PLUGIN_OPTIONS, DpoPluginOptions } from './config/dpo-plugin-options';
 import { DpoRefundService } from './service/dpo-refund.service';
 import { DpoTransactionService } from './service/dpo-transaction.service';
@@ -75,6 +76,13 @@ export const dpoPaymentHandler = new PaymentMethodHandler({
     }
     const dpoTransaction = await dpoTransactionService.getById(ctx, dpoTransactionId);
     if (dpoTransaction.status !== 'paid') {
+      // Someone tried to settle (e.g. an Admin UI click) before DPO confirmed payment.
+      dpoLog.warn('settle', 'refused', {
+        order: order.code,
+        txn: dpoTransaction.id,
+        payment: payment.id,
+        status: dpoTransaction.status,
+      });
       return {
         success: false,
         errorMessage: `DPO transaction ${String(dpoTransaction.id)} has not been confirmed as paid (status: ${dpoTransaction.status}) — settlePayment should only run after verifyAndSettle confirms Result 000`,
@@ -99,6 +107,13 @@ export const dpoPaymentHandler = new PaymentMethodHandler({
       responseXml: result.responseXml,
       resultCode: result.response.result,
       resultExplanation: result.response.resultExplanation,
+    });
+    dpoLog.info('cancel', 'result', {
+      order: order.code,
+      txn: dpoTransaction.id,
+      token: dpoTransaction.transToken,
+      code: result.response.result || 'none',
+      explanation: result.response.resultExplanation,
     });
     // Tolerant of DPO reporting "already cancelled" — this can be invoked either by an
     // admin action or reactively (verifyAndSettle observing DPO's own Result 904).

@@ -8,8 +8,11 @@ static/email/test-emails
 # Local dev fixtures
 dev/
 
-# Environment files
+# Environment files. `.env.development` and `.env.production` are the two the
+# npm scripts look for; plain `.env` is the fallback used on the VM.
 .env
+.env.*
+!.env.example
 
 # Output of the src/scripts/export-* maintenance scripts
 exports/

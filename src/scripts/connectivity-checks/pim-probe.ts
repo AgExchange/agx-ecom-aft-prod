@@ -1,8 +1,9 @@
 /**
  * PIM connectivity probe.
  *
- * Answers three questions about the AtroPIM instance configured in `.env`,
- * without starting Vendure and without changing anything:
+ * Answers three questions about the AtroPIM instance configured in the active
+ * environment file (see `src/load-env.ts`), without starting Vendure and
+ * without changing anything:
  *
  *   1. Is the PIM host reachable from wherever this is run?
  *   2. Do PIM_USER / PIM_PASSWORD authenticate against it?
@@ -18,11 +19,9 @@
  *
  *   npm run check:pim
  *
- * Exit codes: 0 = all checks passed, 1 = a check failed, 2 = .env incomplete.
+ * Exit codes: 0 = all checks passed, 1 = a check failed, 2 = env file incomplete.
  */
-import * as dotenv from 'dotenv';
-
-dotenv.config();
+import { loadedEnvFile } from '../../load-env';
 
 const TIMEOUT_MS = 20_000;
 
@@ -140,7 +139,7 @@ async function probe(): Promise<number> {
     ].filter(Boolean);
 
     if (missing.length) {
-        console.error(`Missing in .env: ${missing.join(', ')}`);
+        console.error(`Missing in ${loadedEnvFile ?? 'the environment'}: ${missing.join(', ')}`);
         return 2;
     }
 

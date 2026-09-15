@@ -1,4 +1,5 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
+import { dpoLog } from '../config/dpo-log';
 import { DpoPluginOptions } from '../config/dpo-plugin-options';
 import { formatServiceDate } from './dpo-date';
 import { DpoApiEnvelope, normalizeEnvelope } from './dpo-envelope';
@@ -92,8 +93,27 @@ export class DpoClient {
       body: requestXml,
     });
     const responseXml = await res.text();
+    const request = String(body.Request ?? 'unknown');
+    // `ok` is compared strictly to false because the test fetch mocks only implement text().
+    if (res.ok === false) {
+      dpoLog.warn('dpo-api', 'http_error', {
+        request,
+        endpoint: baseUrl,
+        httpStatus: res.status,
+        bodyStart: responseXml.slice(0, 80).replace(/\s+/g, ' '),
+      });
+    }
     const parsedRoot = this.parser.parse(responseXml) as Record<string, unknown>;
     const parsed = (parsedRoot?.API3G as Record<string, unknown>) ?? {};
+    if (res.ok !== false && !parsedRoot?.API3G) {
+      // e.g. CloudFront's HTML block page served with a 2xx — nothing parseable came back.
+      dpoLog.warn('dpo-api', 'unexpected_response', {
+        request,
+        endpoint: baseUrl,
+        httpStatus: res.status,
+        bodyStart: responseXml.slice(0, 80).replace(/\s+/g, ' '),
+      });
+    }
     return { requestXml, responseXml, parsed };
   }
 

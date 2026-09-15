@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { DpoClient } from '../api/dpo-client';
+import { dpoLog } from '../config/dpo-log';
 import { DPO_PAY_PLUGIN_OPTIONS, DpoPluginOptions } from '../config/dpo-plugin-options';
 import { DpoRefund } from '../entities/dpo-refund.entity';
 import { DpoTransaction } from '../entities/dpo-transaction.entity';
@@ -74,6 +75,21 @@ export class DpoRefundService {
     dpoRefund.resultExplanation = verify.envelope.explanation;
     dpoRefund.completedAt = new Date();
     dpoRefund = await refundRepo.save(dpoRefund);
+
+    const logFields = {
+      order: dpoTransaction.order?.code ?? dpoTransaction.companyRef,
+      txn: dpoTransaction.id,
+      refund: dpoRefund.id,
+      amount,
+      refundCode: refundResult.response.result || 'none',
+      verifyCode: verify.envelope.code || 'none',
+      explanation: verify.envelope.explanation,
+    };
+    if (success) {
+      dpoLog.info('refund', 'succeeded', logFields);
+    } else {
+      dpoLog.error('refund', 'failed', logFields);
+    }
 
     if (success) {
       const txnRepo = this.connection.getRepository(ctx, DpoTransaction);

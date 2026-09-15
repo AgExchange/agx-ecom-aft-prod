@@ -38,9 +38,11 @@ it, so this implements the integration from scratch against DPO's XML ("API3G") 
       ▼
 2. Customer redirected to DPO's hosted page (getHostedPaymentUrl), pays or cancels
       ▼
-3. DPO reports back TWO ways, both untrusted on their own:
-      ├─ GET  /payments/dpo/return    (browser redirect — DpoRedirectController)
-      └─ POST /payments/dpo/callback  (server-to-server webhook — DpoWebhookController)
+3. DPO sends the customer's BROWSER back with a GET, never trusted on its own:
+      ├─ GET  /payments/dpo/return    (RedirectURL: after paying — DpoRedirectController)
+      └─ GET  /payments/dpo/callback  (BackURL: "Back to Merchant" / cancel / timeout — DpoRedirectController)
+   POST /payments/dpo/callback (DpoWebhookController) is reserved for DPO's pushPayments
+   server push, which is not supported yet — see §10.
       ▼
 4. BOTH funnel into DpoVerifyAndSettleService.verifyAndSettle():
       │  calls DPO's verifyToken (v7) FOR REAL, server-side
@@ -98,6 +100,7 @@ src/plugins/dpo-plugin/
 │
 ├── config/
 │   ├── constants.ts                   loggerCtx, DPO_PAY_METHOD_CODE = 'dpo-pay'
+│   ├── dpo-log.ts                     dpoLog.info/warn/error — one-line `[area] event key=value` logs (§4.1)
 │   ├── dpo-plugin-options.ts          DpoPluginOptions type + validateDpoPluginOptions()
 │   └── dpo-payment-process.ts         Adds the missing Authorized→Declined transition
 │
@@ -171,8 +174,42 @@ per-PaymentMethod fields.
 | Endpoint | Type | Purpose |
 |---|---|---|
 | `initiateDpoPayment` | Shop API mutation | Starts a payment: creates the `dpo_transaction` row, calls `createToken`, adds an `Authorized` Payment, returns the hosted-page redirect URL. Idempotent — reuses an already-open, unexpired transaction rather than always calling `createToken` again (see `DpoTransactionService.findOpenTransactionForOrder`, tested in `__tests__/dpo-transaction.service.unit-spec.ts`). |
-| `GET /payments/dpo/return` | REST | DPO's browser-facing RedirectURL target. Always verifies server-side, always 302-redirects to `storefrontConfirmationUrlTemplate`, even on internal error (`status=error`). |
-| `POST /payments/dpo/callback` | REST | DPO's server-to-server BackURL notification. Reads both query string and body. Always responds `200` regardless of outcome (log-not-throw) — DPO would otherwise retry a callback whose real problem is on our side. |
+| `GET /payments/dpo/return` | REST | DPO's **RedirectURL** target — the customer's browser after paying. Always verifies server-side, always 302-redirects to `storefrontConfirmationUrlTemplate`, even on internal error (`status=error`). |
+| `GET /payments/dpo/callback` | REST | DPO's **BackURL** target — the customer's browser after clicking "Back to Merchant", cancelling, or timing out. Same verify-then-302 behaviour as `/return`. Per DPO's createToken docs, BackURL is a browser GET carrying `TransactionToken`/`CompanyRef`, **not** a server notification. |
+| `POST /payments/dpo/callback` | REST | Reserved for DPO's server-to-server **pushPayments** feature, which is **not supported yet** (XML bodies aren't parsed, and DPO's expected XML `OK` ack isn't sent). Reads query string and form body; always responds `200` (log-not-throw). |
+
+### 4.1 Logs
+
+Every step logs one line under the `DpoPayPlugin` context (helper: `config/dpo-log.ts`), in the
+form `[area] event key=value …`. PM2 writes them to `~/.pm2/logs/vendure-server-out.log`:
+
+```bash
+# live
+pm2 logs vendure-server --lines 0 | grep DpoPayPlugin
+# history
+grep DpoPayPlugin ~/.pm2/logs/vendure-server-out.log
+```
+
+| Line | Level | Meaning |
+|---|---|---|
+| `[initiate] token_created` / `ok` | info | Token issued and Payment attached (Authorized) |
+| `[initiate] token_reused` | info | A retry or double-click reused an open token |
+| `[initiate] reused_without_payment` | warn | Reused a token with **no** Payment attached — a paying customer would never settle (known bug) |
+| `[initiate] create_token_failed` / `add_payment_failed` | error | DPO rejected createToken / Vendure couldn't attach the Payment (token orphaned) |
+| `[return]` / `[back]` / `[callback] received` | info | Something reached our endpoint (callback also logs content type + field names) |
+| `[return]` / `[back] redirect` | info | Where the browser was sent: `order`, verified `status` |
+| `[verify] result` | info | DPO's verifyToken answer: `code`, `class`, resulting `status` |
+| `[verify] payment_moved` | info | Payment → Settled / Declined / Cancelled |
+| `[verify] transition_rejected` | warn | Repeat transition refused — normal when two notifications arrive for one payment |
+| `[verify] no_match` / `no_linked_payment` / `needs_review` | warn | Unknown token / paid-but-unsettleable / needs manual review |
+| `[verify] integration_error` | error | Our request or credentials are wrong — never the customer's payment |
+| `[dpo-api] http_error` / `unexpected_response` | warn | DPO answered with a non-2xx or non-XML body (e.g. a CloudFront 403) |
+| `[refund] succeeded` / `failed` | info / error | Refund outcome after verifyRefund |
+| `[cancel] result` / `[settle] refused` | info / warn | cancelToken outcome / settle attempted before DPO confirmed payment |
+
+Logged: order code, dpo_transaction id, transToken (in full, for now), result codes, payment/refund
+ids, amount, currency, inbound field *names*. **Never logged:** CompanyToken, raw XML, card
+details, customer PII — the full audit trail lives in `dpo_transaction_event`.
 
 ## 5. Amounts, encoding, and other easy-to-miss details
 
@@ -408,6 +445,14 @@ being testable:
   normalized envelope's `code` determines refund success.
 - No scheduled re-poll job for non-terminal transactions (codes `003`/`005`/`007`/`900`)
   that never receive a webhook or redirect.
+- **DPO's pushPayments (server-to-server push) isn't supported.** `BackURL` was originally
+  assumed to be a server webhook; DPO's createToken docs describe it as a customer browser
+  GET, now handled by `GET /payments/dpo/callback`. The real push is configured with DPO,
+  sends an XML body and expects `<?xml version="1.0"?><API3G><Response>OK</Response></API3G>`
+  back — none of which `POST /payments/dpo/callback` handles yet. Until it does (or a re-poll
+  job exists), **the customer's browser returning is the only thing that confirms a payment**:
+  a customer who pays and closes the tab leaves the Payment `Authorized`, and DPO emails an
+  alert when a payment isn't verified within 30 minutes.
 - Cumulative multi-partial-refund tracking isn't modelled (§6).
 - `TransactionPaymentDate`'s UTC assumption is unconfirmed (§5).
 - The production Postgres migration for the 3 entities has not been generated/run — see

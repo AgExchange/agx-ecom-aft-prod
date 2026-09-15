@@ -5,6 +5,7 @@ import gql from 'graphql-tag';
 import { DpoClient } from './dpo-client';
 import { computePtlExpiresAt } from './dpo-date';
 import { DPO_PAY_METHOD_CODE } from '../config/constants';
+import { dpoLog } from '../config/dpo-log';
 import { DPO_PAY_PLUGIN_OPTIONS, DpoPluginOptions } from '../config/dpo-plugin-options';
 import { DpoTransactionService } from '../service/dpo-transaction.service';
 
@@ -47,6 +48,7 @@ export class DpoPayResolver {
   async initiateDpoPayment(@Ctx() ctx: RequestContext) {
     const order = await this.activeOrderService.getActiveOrder(ctx, undefined);
     if (!order) {
+      dpoLog.warn('initiate', 'no_active_order', { channel: ctx.channel?.code });
       return { success: false, message: 'No active order' };
     }
 
@@ -54,6 +56,22 @@ export class DpoPayResolver {
     // than always calling createToken again.
     const existing = await this.dpoTransactionService.findOpenTransactionForOrder(ctx, order.id);
     if (existing?.transToken) {
+      if (existing.payment) {
+        dpoLog.info('initiate', 'token_reused', {
+          order: order.code,
+          txn: existing.id,
+          token: existing.transToken,
+          payment: existing.payment.id,
+        });
+      } else {
+        // Known bug: this token's Payment was never attached (an earlier attempt failed at
+        // addPaymentToOrder). If the customer pays with it, the order can never settle.
+        dpoLog.warn('initiate', 'reused_without_payment', {
+          order: order.code,
+          txn: existing.id,
+          token: existing.transToken,
+        });
+      }
       return {
         success: true,
         transToken: existing.transToken,
@@ -105,8 +123,23 @@ export class DpoPayResolver {
     );
 
     if (result.response.result !== '000' || !updated.transToken) {
+      dpoLog.error('initiate', 'create_token_failed', {
+        order: order.code,
+        txn: updated.id,
+        code: result.response.result || 'none',
+        explanation: result.response.resultExplanation,
+      });
       return { success: false, message: `DPO createToken failed: ${result.response.resultExplanation}` };
     }
+
+    dpoLog.info('initiate', 'token_created', {
+      order: order.code,
+      txn: updated.id,
+      token: updated.transToken,
+      amount: order.totalWithTax / 100,
+      currency: order.currencyCode,
+      attempt: attemptCount + 1,
+    });
 
     // This is what drives dpoPaymentHandler.createPayment into Authorized — see
     // ../dpo-payment-handler.ts.
@@ -115,6 +148,14 @@ export class DpoPayResolver {
       metadata: { dpoTransactionId: updated.id, transToken: updated.transToken },
     });
     if ('errorCode' in addResult) {
+      // The DPO token above is now orphaned: it's saved, but no Payment is attached to it.
+      dpoLog.error('initiate', 'add_payment_failed', {
+        order: order.code,
+        txn: updated.id,
+        token: updated.transToken,
+        error: addResult.errorCode,
+        message: addResult.message,
+      });
       return { success: false, message: addResult.message };
     }
 
@@ -126,7 +167,11 @@ export class DpoPayResolver {
     const payment = payments.find(p => p.transactionId === updated.transToken);
     if (payment) {
       await this.dpoTransactionService.linkPayment(ctx, updated.id, payment);
+    } else {
+      dpoLog.warn('initiate', 'payment_not_found', { order: order.code, txn: updated.id, token: updated.transToken });
     }
+
+    dpoLog.info('initiate', 'ok', { order: order.code, txn: updated.id, payment: payment?.id });
 
     return {
       success: true,

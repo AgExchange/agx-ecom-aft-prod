@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { ID, Logger, Order, Payment, RequestContext, TransactionalConnection } from '@vendure/core';
+import { ID, Order, Payment, RequestContext, TransactionalConnection } from '@vendure/core';
 import { DpoVerifyTokenV7Response } from '../api/dpo-xml-types';
 import { parseDpoDateOnly, parseDpoDateTimeAssumeUtc } from '../api/dpo-date';
-import { loggerCtx } from '../config/constants';
+import { dpoLog } from '../config/dpo-log';
 import { DpoTransaction } from '../entities/dpo-transaction.entity';
 import { DpoTransactionEvent, DpoTransactionEventType } from '../entities/dpo-transaction-event.entity';
 import { classifyResultCode, DpoResultCodeInfo } from './dpo-result-code';
@@ -161,18 +161,24 @@ export class DpoTransactionService {
     });
 
     if (resultInfo.class === 'integration-error') {
-      Logger.error(
-        `DPO verifyToken returned integration-error ${resultInfo.code} (${resultInfo.explanation}) for dpo_transaction ${dpoTransaction.id} — leaving status untouched`,
-        loggerCtx,
-      );
+      // Our request or credentials are wrong — never the customer's payment. Status left untouched.
+      dpoLog.error('verify', 'integration_error', {
+        order: dpoTransaction.order?.code ?? dpoTransaction.companyRef,
+        txn: dpoTransaction.id,
+        code: resultInfo.code || 'none',
+        explanation: resultInfo.explanation,
+      });
       return { transaction: dpoTransaction, resultInfo };
     }
 
     if (resultInfo.class === 'needs-review') {
-      Logger.warn(
-        `DPO verifyToken returned ${resultInfo.code} (${resultInfo.explanation}) for dpo_transaction ${dpoTransaction.id} — needs manual review, never auto-settled`,
-        loggerCtx,
-      );
+      // e.g. 002 overpaid/underpaid — never auto-settled.
+      dpoLog.warn('verify', 'needs_review', {
+        order: dpoTransaction.order?.code ?? dpoTransaction.companyRef,
+        txn: dpoTransaction.id,
+        code: resultInfo.code,
+        explanation: resultInfo.explanation,
+      });
     }
 
     const r = result.response;
@@ -221,6 +227,8 @@ export class DpoTransactionService {
       where: { order: { id: orderId } },
       order: { createdAt: 'DESC' },
       take: 5,
+      // Loaded so the resolver can warn when it reuses a token whose Payment was never attached.
+      relations: { payment: true },
     });
     const now = Date.now();
     return found.find(
